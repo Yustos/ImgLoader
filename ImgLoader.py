@@ -1,51 +1,35 @@
-import urllib2
-import os
-from bs4 import BeautifulSoup
-from urlparse import urlparse
-from tornado.ioloop import IOLoop
-from tornado.web import RequestHandler, Application, url
+import CommandBot
+import CommandWeb
+import Processor
 
-def ParseId(url):
-    path = urlparse(url).path
-    pathPart = path.split("/").pop()
-    id = int(pathPart.split("-")[0])
-    return id
+import logging
+from optparse import OptionParser
 
-def ParsePage(url, id):
-    html = urllib2.urlopen(url)
-    soup = BeautifulSoup(html)
-    divContainer = soup.find("div", {"id": "news-id-%i" % id})
-    images = divContainer.find_all("img")
-    result = [x.attrs["src"] for x in images]
-    return result
+def getOptions():
+    optp = OptionParser()
+    optp.add_option('-q', '--quiet', help='set logging to ERROR',
+                    action='store_const', dest='loglevel',
+                    const=logging.ERROR, default=logging.INFO)
+    optp.add_option('-d', '--debug', help='set logging to DEBUG',
+                    action='store_const', dest='loglevel',
+                    const=logging.DEBUG, default=logging.INFO)
+    optp.add_option('-v', '--verbose', help='set logging to COMM',
+                    action='store_const', dest='loglevel',
+                    const=5, default=logging.INFO)
 
-def DownloadUrls(urls, id):
-    if not os.path.exists(str(id)):
-        os.mkdir(str(id))
-    for url in urls:
-        print(url)
-        local = "%i/%s" % (id, os.path.basename(url))
-        if not os.path.exists(local):
-            f = urllib2.urlopen(url)
-            with open(local, "wb") as local_file:
-                local_file.write(f.read())
+    optp.add_option("-f", "--folder", dest="folder", help="Folder to store files")
 
-def ProcessUrl(url):
-    id = ParseId(url)
-    urls = ParsePage(url, id)
-    DownloadUrls(urls, id)
-    return urls
+    optp.add_option("-j", "--jid", dest="jid", help="JID to use")
+    optp.add_option("-p", "--password", dest="password", help="password to use")
+    optp.add_option("--phost", dest="proxy_host", help="Proxy hostname")
+    optp.add_option("--pport", dest="proxy_port", help="Proxy port")
+    optp.add_option("--puser", dest="proxy_user", help="Proxy username")
+    optp.add_option("--ppass", dest="proxy_pass", help="Proxy password")
 
-class DownloadHandler(RequestHandler):
-    def get(self, url):
-        urls = ProcessUrl(url)
-        for url in urls:
-            self.write("%s<br/>" % url)
-
-application = Application([
-    url(r"/download/(.*)", DownloadHandler, name="download")
-])
+    opts, args = optp.parse_args()
+    return opts
 
 if __name__ == "__main__":
-    application.listen(9356)
-    IOLoop.instance().start()
+    opts = getOptions()
+    CommandBot.start(opts)
+    CommandWeb.start(opts)
